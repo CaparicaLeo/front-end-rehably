@@ -49,10 +49,10 @@
         :to="`/patients/${p.id}`"
         class="card patient-card"
       >
-        <div class="patient-avatar">{{ initial(p.user?.name) }}</div>
+        <div class="patient-avatar">{{ initial(p.name || p.user?.name) }}</div>
         <div class="patient-info">
-          <div class="patient-name">{{ p.user?.name }}</div>
-          <div class="patient-meta">{{ p.user?.email }}</div>
+          <div class="patient-name">{{ p.name || p.user?.name }}</div>
+          <div class="patient-meta">{{ p.email || p.user?.email }}</div>
           <div class="patient-meta" v-if="p.birth_date">{{ age(p.birth_date) }} anos</div>
         </div>
         <div class="patient-arrow">

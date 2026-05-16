@@ -5,6 +5,8 @@ export const authApi = {
   logout: () => api.post('/logout'),
   me: () => api.get('/user'),
   register: (data) => api.post('/register', data),
+  forgotPassword: (data) => api.post('/forgot-password', data),
+  resetPassword: (data) => api.post('/reset-password', data),
 }
 
 export const treatmentsApi = {
@@ -37,4 +39,12 @@ export const patientsApi = {
   update: (id, data) => api.put(`/patients/${id}`, data),
   delete: (id) => api.delete(`/patients/${id}`),
   getTreatments: (id) => api.get(`/patients/${id}/treatments`),
+}
+
+export const exercisesApi = {
+  list: () => api.get('/exercises'),
+  get: (id) => api.get(`/exercises/${id}`),
+  create: (data) => api.post('/exercises', data),
+  update: (id, data) => api.put(`/exercises/${id}`, data),
+  delete: (id) => api.delete(`/exercises/${id}`),
 }

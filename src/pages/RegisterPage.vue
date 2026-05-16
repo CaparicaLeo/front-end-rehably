@@ -149,7 +149,9 @@ async function handleRegister() {
     await auth.login({ email: form.email, password: form.password })
     router.push('/dashboard')
   } catch (e) {
-    error.value = e.response?.data?.message || e.response?.data?.errors ? Object.values(e.response.data.errors).flat().join(', ') : 'Erro ao criar conta.'
+    const msg = e.response?.data?.message
+    const errs = e.response?.data?.errors
+    error.value = errs ? Object.values(errs).flat().join(', ') : (msg || 'Erro ao criar conta.')
   } finally {
     loading.value = false
   }

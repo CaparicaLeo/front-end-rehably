@@ -15,41 +15,24 @@
         </div>
         <h1 class="brand-name">Reably</h1>
       </div>
-      <p class="brand-tagline">Painel do Fisioterapeuta</p>
+      <p class="brand-tagline">Recuperar senha</p>
 
-      <form class="login-form" @submit.prevent="handleLogin">
+      <form class="login-form" @submit.prevent="handleForgot">
         <div class="form-group">
-          <label class="form-label">E-mail</label>
-          <input v-model="form.email" type="email" class="form-input" placeholder="seu@email.com" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Senha</label>
-          <div class="input-wrapper">
-            <input v-model="form.password" :type="showPwd ? 'text' : 'password'" class="form-input" placeholder="••••••••" required />
-            <button type="button" class="eye-btn" @click="showPwd = !showPwd">
-              <svg v-if="!showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </svg>
-            </button>
-          </div>
+          <label class="form-label">E-mail cadastrado</label>
+          <input v-model="email" type="email" class="form-input" placeholder="seu@email.com" required />
         </div>
 
+        <div v-if="success" class="success-msg">{{ success }}</div>
         <div v-if="error" class="error-msg">{{ error }}</div>
 
         <button type="submit" class="btn btn-primary login-btn" :disabled="loading">
           <span v-if="loading" class="spinner"></span>
-          <span>{{ loading ? 'Entrando...' : 'Entrar' }}</span>
+          <span>{{ loading ? 'Enviando...' : 'Enviar link de recuperação' }}</span>
         </button>
 
         <p class="login-link">
-          Não tem conta? <RouterLink to="/register">Criar conta</RouterLink>
-        </p>
-        <p class="login-link" style="margin-top:-12px">
-          <RouterLink to="/forgot-password">Esqueci a senha</RouterLink>
+          Lembrou a senha? <RouterLink to="/login">Entrar</RouterLink>
         </p>
       </form>
     </div>
@@ -57,25 +40,24 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import { authApi } from '../api/services'
 
-const auth = useAuthStore()
-const router = useRouter()
-const form = reactive({ email: '', password: '' })
+const email = ref('')
 const loading = ref(false)
 const error = ref('')
-const showPwd = ref(false)
+const success = ref('')
 
-async function handleLogin() {
+async function handleForgot() {
   error.value = ''
+  success.value = ''
   loading.value = true
   try {
-    await auth.login(form)
-    router.push('/dashboard')
+    await authApi.forgotPassword({ email: email.value })
+    success.value = 'Se o e-mail existir, enviaremos um link de recuperação.'
   } catch (e) {
-    error.value = e.response?.data?.message || 'Credenciais inválidas.'
+    error.value = e.response?.data?.message || 'Erro ao solicitar recuperação.'
   } finally {
     loading.value = false
   }
@@ -119,16 +101,11 @@ async function handleLogin() {
 
 .login-form { display: flex; flex-direction: column; gap: 20px; }
 
-.input-wrapper { position: relative; }
-.input-wrapper .form-input { padding-right: 42px; }
-.eye-btn {
-  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-  background: none; border: none; cursor: pointer;
-  color: var(--text-muted); display: flex;
-  transition: color var(--transition);
+.success-msg {
+  background: var(--green-dim); border: 1px solid rgba(34,197,94,0.2);
+  color: var(--green); border-radius: var(--radius-sm);
+  padding: 10px 14px; font-size: 13px;
 }
-.eye-btn:hover { color: var(--text); }
-
 .error-msg {
   background: var(--red-dim); border: 1px solid rgba(239,68,68,0.2);
   color: var(--red); border-radius: var(--radius-sm);

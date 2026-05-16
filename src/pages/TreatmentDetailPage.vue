@@ -54,7 +54,10 @@
         </div>
 
         <div v-else class="items-list">
-          <div v-for="item in store.items" :key="item.id" class="item-row">
+            <div v-for="item in store.items" :key="item.id" class="item-row">
+            <div class="item-name-col">
+              <div class="item-exercise-title">{{ exerciseTitle(item) }}</div>
+            </div>
             <div class="item-chips">
               <span v-if="item.sets" class="item-chip chip-blue">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -101,6 +104,13 @@
               </button>
             </div>
             <form @submit.prevent="handleItemSubmit" class="modal-form">
+              <div class="form-group">
+                <label class="form-label">Exercício *</label>
+                <select v-model="itemForm.exercise_id" class="form-select" required>
+                  <option value="" disabled>Selecione um exercício</option>
+                  <option v-for="ex in exercises" :key="ex.id" :value="ex.id">{{ ex.title }}</option>
+                </select>
+              </div>
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label">Séries</label>
@@ -144,23 +154,34 @@
 import { ref, reactive, onMounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useTreatmentsStore } from '../stores/treatments'
+import { exercisesApi } from '../api/services'
 
 const store = useTreatmentsStore()
 const route = useRoute()
 const router = useRouter()
 
 const treatment = ref(null)
+const exercises = ref([])
 const loadingItems = ref(false)
 const showItemModal = ref(false)
 const editingItem = ref(null)
 const itemSubmitting = ref(false)
 const itemError = ref('')
-const itemForm = reactive({ sets: null, repetitions: null, duration_seconds: null, frequency_text: '' })
+const itemForm = reactive({ exercise_id: '', sets: null, repetitions: null, duration_seconds: null, frequency_text: '' })
 
 const statusLabel = { ongoing: 'Em andamento', completed: 'Concluído', cancelled: 'Cancelado' }
 
+function exerciseTitle(item) {
+  const ex = exercises.value.find(e => e.id === item.exercise_id)
+  return ex?.title || 'Exercício #' + (item.exercise_id?.slice(0, 8) || '?')
+}
+
 onMounted(async () => {
   treatment.value = await store.fetchOne(route.params.id)
+  try {
+    const res = await exercisesApi.list()
+    exercises.value = res.data.data || res.data
+  } catch {}
   loadingItems.value = true
   await store.fetchItems(route.params.id)
   loadingItems.value = false
@@ -185,10 +206,12 @@ async function handleDelete() {
 function openItemModal(item = null) {
   editingItem.value = item
   if (item) {
+    itemForm.exercise_id = item.exercise_id || ''
     itemForm.sets = item.sets; itemForm.repetitions = item.repetitions
     itemForm.duration_seconds = item.duration_seconds; itemForm.frequency_text = item.frequency_text || ''
   } else {
-    itemForm.sets = null; itemForm.repetitions = null; itemForm.duration_seconds = null; itemForm.frequency_text = ''
+    itemForm.exercise_id = ''; itemForm.sets = null; itemForm.repetitions = null
+    itemForm.duration_seconds = null; itemForm.frequency_text = ''
   }
   itemError.value = ''; showItemModal.value = true
 }
@@ -197,7 +220,7 @@ function closeItemModal() { showItemModal.value = false; editingItem.value = nul
 
 async function handleItemSubmit() {
   itemError.value = ''; itemSubmitting.value = true
-  const data = {}
+  const data = { exercise_id: itemForm.exercise_id }
   if (itemForm.sets) data.sets = itemForm.sets
   if (itemForm.repetitions) data.repetitions = itemForm.repetitions
   if (itemForm.duration_seconds) data.duration_seconds = itemForm.duration_seconds
@@ -242,6 +265,8 @@ async function deleteItem(id) {
   background: var(--surface-2); transition: background var(--transition);
 }
 .item-row:hover { background: var(--bg); }
+.item-name-col { min-width: 140px; flex-shrink: 0; }
+.item-exercise-title { font-size: 14px; font-weight: 600; }
 .item-chips { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
 .item-chip {
   display: inline-flex; align-items: center; gap: 5px;

@@ -52,7 +52,7 @@
           <p>Nenhum endereço cadastrado.</p>
         </div>
         <div v-else class="addr-list">
-          <div v-for="addr in addresses" :key="addr.id" class="addr-row">
+            <div v-for="addr in addresses" :key="addr.id" class="addr-row" @click="openAddrModal(addr)">
             <div class="addr-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="1.8">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
@@ -62,7 +62,7 @@
               <div class="addr-street">{{ addr.street }}, {{ addr.number }}<span v-if="addr.complement"> — {{ addr.complement }}</span></div>
               <div class="addr-city">{{ addr.neighborhood }}, {{ addr.city }} / {{ addr.state }} · {{ addr.postal_code }}</div>
             </div>
-            <button class="icon-btn danger" @click="deleteAddress(addr.id)">
+            <button class="icon-btn danger" @click.stop="deleteAddress(addr.id)">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/>
               </svg>
@@ -78,7 +78,7 @@
         <div v-if="showAddrModal" class="modal-overlay" @click.self="closeAddrModal">
           <div class="modal-box">
             <div class="modal-header">
-              <h3>Novo Endereço</h3>
+              <h3>{{ editingAddress ? 'Editar Endereço' : 'Novo Endereço' }}</h3>
               <button class="icon-btn" @click="closeAddrModal">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -143,6 +143,7 @@ const auth = useAuthStore()
 const addresses = ref([])
 const loadingAddresses = ref(false)
 const showAddrModal = ref(false)
+const editingAddress = ref(null)
 const addrSubmitting = ref(false)
 const addrError = ref('')
 const addrForm = reactive({ postal_code: '', number: '', street: '', neighborhood: '', city: '', state: '', complement: '' })
@@ -172,14 +173,37 @@ async function fetchCep() {
   } catch {}
 }
 
-function openAddrModal() { Object.assign(addrForm, { postal_code: '', number: '', street: '', neighborhood: '', city: '', state: '', complement: '' }); addrError.value = ''; showAddrModal.value = true }
-function closeAddrModal() { showAddrModal.value = false }
+function openAddrModal(addr = null) {
+  editingAddress.value = addr
+  if (addr) {
+    Object.assign(addrForm, {
+      postal_code: addr.postal_code || '',
+      number: addr.number || '',
+      street: addr.street || '',
+      neighborhood: addr.neighborhood || '',
+      city: addr.city || '',
+      state: addr.state || '',
+      complement: addr.complement || ''
+    })
+  } else {
+    Object.assign(addrForm, { postal_code: '', number: '', street: '', neighborhood: '', city: '', state: '', complement: '' })
+  }
+  addrError.value = ''
+  showAddrModal.value = true
+}
+function closeAddrModal() { showAddrModal.value = false; editingAddress.value = null }
 
 async function handleAddrSubmit() {
   addrError.value = ''; addrSubmitting.value = true
   try {
-    const res = await addressApi.create({ ...addrForm, user_id: auth.user.id })
-    addresses.value.push(res.data)
+    if (editingAddress.value) {
+      const res = await addressApi.update(editingAddress.value.id, addrForm)
+      const idx = addresses.value.findIndex(a => a.id === editingAddress.value.id)
+      if (idx !== -1) addresses.value[idx] = res.data
+    } else {
+      const res = await addressApi.create({ ...addrForm, user_id: auth.user.id })
+      addresses.value.push(res.data)
+    }
     closeAddrModal()
   } catch (e) {
     addrError.value = e.response?.data?.message || 'Erro ao salvar endereço.'
@@ -219,7 +243,8 @@ async function deleteAddress(id) {
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-title { font-size: 15px; font-weight: 600; }
 .addr-list { display: flex; flex-direction: column; gap: 4px; }
-.addr-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.addr-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border-radius: var(--radius-sm); background: var(--surface-2); cursor: pointer; transition: background var(--transition); }
+.addr-row:hover { background: var(--bg); }
 .addr-icon { flex-shrink: 0; width: 32px; height: 32px; background: var(--teal-dim); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
 .addr-info { flex: 1; }
 .addr-street { font-size: 14px; font-weight: 500; }

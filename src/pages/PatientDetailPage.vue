@@ -60,7 +60,7 @@
         >
           <div class="treatment-info">
             <div class="treatment-name">{{ t.title }}</div>
-            <div class="treatment-meta">{{ t.date ? formatDate(t.date) : 'Sem data' }}</div>
+            <div class="treatment-meta">{{ t.start_date ? formatDate(t.start_date) : 'Sem data' }}</div>
           </div>
           <div class="treatment-status" :class="statusClass(t.status)">{{ statusLabel(t.status) }}</div>
           <div class="treatment-arrow">
@@ -86,18 +86,7 @@
               </button>
             </div>
             <form @submit.prevent="handleEditSubmit" class="modal-form">
-              <div class="form-group">
-                <label class="form-label">Nome completo *</label>
-                <input v-model="editForm.name" class="form-input" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">E-mail *</label>
-                <input v-model="editForm.email" type="email" class="form-input" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Telefone</label>
-                <input v-model="editForm.phone_number" class="form-input" placeholder="(42) 99999-9999" />
-              </div>
+              <div class="form-section-desc">Dados do paciente que podem ser alterados.</div>
               <div class="form-group">
                 <label class="form-label">Data de nascimento *</label>
                 <input v-model="editForm.birth_date" type="date" class="form-input" required />
@@ -139,12 +128,8 @@
                 <input v-model="treatmentForm.title" class="form-input" required placeholder="Ex: Fisioterapia Motora" />
               </div>
               <div class="form-group">
-                <label class="form-label">Descrição</label>
-                <textarea v-model="treatmentForm.description" class="form-textarea" placeholder="Descrição do tratamento..."></textarea>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Data de início</label>
-                <input v-model="treatmentForm.date" type="date" class="form-input" />
+                <label class="form-label">Data de início *</label>
+                <input v-model="treatmentForm.start_date" type="date" class="form-input" required />
               </div>
               <div v-if="treatmentError" class="error-msg">{{ treatmentError }}</div>
               <div class="modal-actions">
@@ -182,11 +167,11 @@ const error = ref('')
 const treatmentError = ref('')
 
 const editForm = reactive({
-  name: '', email: '', phone_number: '', birth_date: '', clinical_condition: ''
+  birth_date: '', clinical_condition: ''
 })
 
 const treatmentForm = reactive({
-  title: '', description: '', date: ''
+  title: '', start_date: ''
 })
 
 function initial(name) {
@@ -203,12 +188,12 @@ function formatDate(date) {
 }
 
 function statusClass(status) {
-  const map = { active: 'status-active', completed: 'status-completed', cancelled: 'status-cancelled' }
+  const map = { ongoing: 'status-active', completed: 'status-completed', cancelled: 'status-cancelled' }
   return map[status] || ''
 }
 
 function statusLabel(status) {
-  const map = { active: 'Em andamento', completed: 'Concluído', cancelled: 'Cancelado' }
+  const map = { ongoing: 'Em andamento', completed: 'Concluído', cancelled: 'Cancelado' }
   return map[status] || status
 }
 
@@ -219,9 +204,6 @@ async function loadPatient() {
     console.log('Patient data:', patient.value)
     if (patient.value) {
       Object.assign(editForm, {
-        name: patient.value.user?.name || patient.value.name || '',
-        email: patient.value.email || patient.value.user?.email || '',
-        phone_number: patient.value.phone_number || patient.value.user?.phone_number || '',
         birth_date: patient.value.birth_date || '',
         clinical_condition: patient.value.clinical_condition || ''
       })
@@ -256,7 +238,7 @@ async function handleEditSubmit() {
 }
 
 function openTreatmentModal() {
-  Object.assign(treatmentForm, { title: '', description: '', date: '' })
+  Object.assign(treatmentForm, { title: '', start_date: new Date().toISOString().slice(0, 10) })
   treatmentError.value = ''
   showTreatmentModal.value = true
 }
@@ -331,6 +313,7 @@ onMounted(() => loadPatient())
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
 .modal-header h3 { font-size: 16px; font-weight: 600; }
 .modal-form { padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.form-section-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
 .error-msg { background: var(--red-dim); border: 1px solid rgba(239,68,68,0.2); color: var(--red); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; }
 

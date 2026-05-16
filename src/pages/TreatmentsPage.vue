@@ -81,6 +81,13 @@
               </button>
             </div>
             <form @submit.prevent="handleSubmit" class="modal-form">
+              <div class="form-group" v-if="!editing">
+                <label class="form-label">Paciente *</label>
+                <select v-model="form.patient_id" class="form-select" required>
+                  <option value="" disabled>Selecione um paciente</option>
+                  <option v-for="p in patientsStore.patients" :key="p.id" :value="p.id">{{ p.name || p.user?.name || p.email }}</option>
+                </select>
+              </div>
               <div class="form-group">
                 <label class="form-label">Título *</label>
                 <input v-model="form.title" class="form-input" required placeholder="Ex: Reabilitação pós-cirúrgica" />
@@ -123,9 +130,13 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useTreatmentsStore } from '../stores/treatments'
+import { usePatientsStore } from '../stores/patients'
+import { useAuthStore } from '../stores/auth'
 
 const store = useTreatmentsStore()
-onMounted(() => store.fetchAll())
+const patientsStore = usePatientsStore()
+const auth = useAuthStore()
+onMounted(() => { store.fetchAll(); patientsStore.fetchAll() })
 
 const search = ref('')
 const statusFilter = ref('all')
@@ -133,7 +144,7 @@ const showModal = ref(false)
 const editing = ref(null)
 const submitting = ref(false)
 const modalError = ref('')
-const form = reactive({ title: '', start_date: '', end_date: '', status: 'ongoing' })
+const form = reactive({ title: '', start_date: '', end_date: '', status: 'ongoing', patient_id: '' })
 
 const statusLabel = { ongoing: 'Em andamento', completed: 'Concluído', cancelled: 'Cancelado' }
 const filters = [
@@ -156,7 +167,7 @@ function openModal(t = null) {
   if (t) {
     form.title = t.title; form.start_date = t.start_date; form.end_date = t.end_date || ''; form.status = t.status
   } else {
-    form.title = ''; form.start_date = new Date().toISOString().slice(0, 10); form.end_date = ''; form.status = 'ongoing'
+    form.title = ''; form.start_date = new Date().toISOString().slice(0, 10); form.end_date = ''; form.status = 'ongoing'; form.patient_id = ''
   }
   modalError.value = ''
   showModal.value = true
@@ -169,8 +180,13 @@ async function handleSubmit() {
   try {
     const data = { ...form }
     if (!data.end_date) delete data.end_date
-    if (editing.value) await store.update(editing.value.id, data)
-    else await store.create(data)
+    if (editing.value) {
+      delete data.patient_id
+      await store.update(editing.value.id, data)
+    } else {
+      if (auth.user?.doctor?.id) data.doctor_id = auth.user.doctor.id
+      await store.create(data)
+    }
     closeModal()
   } catch (e) {
     modalError.value = e.response?.data?.message || 'Erro ao salvar.'

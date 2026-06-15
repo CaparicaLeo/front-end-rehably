@@ -11,14 +11,19 @@
       </button>
     </div>
 
-    <!-- Search -->
+    <!-- Filters -->
     <div class="filters-bar">
       <div class="search-wrapper">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input v-model="search" class="search-input" placeholder="Buscar por nome..." />
+        <input v-model="search" class="search-input" placeholder="Buscar por nome..." @input="onSearch" />
       </div>
+      <select v-model="activeFilter" class="form-select filter-select" @change="onFilterChange">
+        <option value="">Todos</option>
+        <option value="true">Ativos</option>
+        <option value="false">Inativos</option>
+      </select>
     </div>
 
     <!-- Loading -->
@@ -33,7 +38,7 @@
     </div>
 
     <!-- Empty -->
-    <div v-else-if="!filtered.length" class="empty-state card">
+    <div v-else-if="!store.patients.length" class="empty-state card">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
         <circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
         <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
@@ -45,7 +50,7 @@
     <!-- Grid -->
     <div v-else class="patients-grid">
       <RouterLink
-        v-for="p in filtered" :key="p.id"
+        v-for="p in store.patients" :key="p.id"
         :to="`/patients/${p.id}`"
         class="card patient-card"
       >
@@ -55,12 +60,26 @@
           <div class="patient-meta">{{ p.email || p.user?.email }}</div>
           <div class="patient-meta" v-if="p.birth_date">{{ age(p.birth_date) }} anos</div>
         </div>
+        <div class="patient-status" v-if="p.active === false">
+          <span class="badge badge-cancelled">Inativo</span>
+        </div>
         <div class="patient-arrow">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
         </div>
       </RouterLink>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="store.pagination.lastPage > 1" class="pagination">
+      <button class="btn btn-ghost btn-sm" :disabled="page === 1" @click="goTo(page - 1)">
+        Anterior
+      </button>
+      <span class="page-info">Página {{ page }} de {{ store.pagination.lastPage }}</span>
+      <button class="btn btn-ghost btn-sm" :disabled="page === store.pagination.lastPage" @click="goTo(page + 1)">
+        Próxima
+      </button>
     </div>
 
     <!-- Modal -->
@@ -130,16 +149,17 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { usePatientsStore } from '../stores/patients'
 import { useAuthStore } from '../stores/auth'
 
 const store = usePatientsStore()
 const auth = useAuthStore()
-onMounted(() => store.fetchAll())
 
 const search = ref('')
+const activeFilter = ref('')
+const page = ref(1)
 const showModal = ref(false)
 const submitting = ref(false)
 const error = ref('')
@@ -148,11 +168,29 @@ const form = reactive({
   phone_number: '', birth_date: '', clinical_condition: ''
 })
 
-const filtered = computed(() =>
-  store.patients.filter(p =>
-    !search.value || p.user?.name?.toLowerCase().includes(search.value.toLowerCase())
-  )
-)
+function load() {
+  const params = { page: page.value, per_page: 15 }
+  if (search.value) params.search = search.value
+  if (activeFilter.value) params.active = activeFilter.value
+  store.fetchAll(params)
+}
+
+onMounted(() => load())
+
+function onSearch() {
+  page.value = 1
+  load()
+}
+
+function onFilterChange() {
+  page.value = 1
+  load()
+}
+
+function goTo(p) {
+  page.value = p
+  load()
+}
 
 function initial(name) {
   return name?.[0]?.toUpperCase() || '?'
@@ -178,15 +216,12 @@ async function handleSubmit() {
   error.value = ''
   submitting.value = true
   try {
-    await store.create({
-      ...form,
-      doctor_id: auth.user.doctor.id
-    })
+    await store.create({ ...form, doctor_id: auth.user.doctor.id })
     closeModal()
+    load()
   } catch (e) {
     console.error(e)
-    const msg = e.response?.data?.message || e.message || 'Erro ao cadastrar paciente.'
-    error.value = msg
+    error.value = e.response?.data?.message || e.message || 'Erro ao cadastrar paciente.'
   } finally {
     submitting.value = false
   }
@@ -199,7 +234,7 @@ async function handleSubmit() {
 .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
 .page-sub { color: var(--text-muted); font-size: 13px; }
 
-.filters-bar { display: flex; gap: 12px; }
+.filters-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .search-wrapper {
   display: flex; align-items: center; gap: 10px;
   background: var(--surface); border: 1px solid var(--border);
@@ -212,6 +247,7 @@ async function handleSubmit() {
   color: var(--text); font-family: var(--font-body); font-size: 14px;
   padding: 10px 0; flex: 1;
 }
+.filter-select { max-width: 160px; }
 
 .patients-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .patient-card {
@@ -232,7 +268,14 @@ async function handleSubmit() {
 .patient-info { flex: 1; min-width: 0; }
 .patient-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .patient-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.patient-status { flex-shrink: 0; }
 .patient-arrow { color: var(--text-muted); flex-shrink: 0; }
+
+.pagination {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 16px 0;
+}
+.page-info { font-size: 13px; color: var(--text-muted); }
 
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; color: var(--text-muted); padding: 60px; }
 

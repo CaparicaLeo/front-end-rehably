@@ -17,13 +17,13 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input v-model="search" class="search-input" placeholder="Buscar por título..." />
+        <input v-model="search" class="search-input" placeholder="Buscar por título..." @input="onSearch" />
       </div>
       <div class="filter-tabs">
         <button
           v-for="f in filters" :key="f.value"
           class="filter-tab" :class="{ active: statusFilter === f.value }"
-          @click="statusFilter = f.value"
+          @click="onStatusFilter(f.value)"
         >{{ f.label }}</button>
       </div>
     </div>
@@ -37,7 +37,7 @@
       </div>
     </div>
 
-    <div v-else-if="!filtered.length" class="empty-state card">
+    <div v-else-if="!store.treatments.length" class="empty-state card">
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
         <path d="M9 12h6M12 9v6"/><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
       </svg>
@@ -47,7 +47,7 @@
 
     <div v-else class="treatments-grid">
       <RouterLink
-        v-for="t in filtered" :key="t.id"
+        v-for="t in store.treatments" :key="t.id"
         :to="`/treatments/${t.id}`"
         class="card treatment-card"
       >
@@ -65,6 +65,17 @@
           <span v-if="t.end_date">Fim: {{ formatDate(t.end_date) }}</span>
         </div>
       </RouterLink>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="store.pagination.lastPage > 1" class="pagination">
+      <button class="btn btn-ghost btn-sm" :disabled="page === 1" @click="goTo(page - 1)">
+        Anterior
+      </button>
+      <span class="page-info">Página {{ page }} de {{ store.pagination.lastPage }}</span>
+      <button class="btn btn-ghost btn-sm" :disabled="page === store.pagination.lastPage" @click="goTo(page + 1)">
+        Próxima
+      </button>
     </div>
 
     <!-- Modal -->
@@ -127,7 +138,7 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useTreatmentsStore } from '../stores/treatments'
 import { usePatientsStore } from '../stores/patients'
@@ -136,10 +147,10 @@ import { useAuthStore } from '../stores/auth'
 const store = useTreatmentsStore()
 const patientsStore = usePatientsStore()
 const auth = useAuthStore()
-onMounted(() => { store.fetchAll(); patientsStore.fetchAll() })
 
 const search = ref('')
 const statusFilter = ref('all')
+const page = ref(1)
 const showModal = ref(false)
 const editing = ref(null)
 const submitting = ref(false)
@@ -154,13 +165,27 @@ const filters = [
   { label: 'Cancelados', value: 'cancelled' },
 ]
 
-const filtered = computed(() => {
-  return store.treatments.filter(t => {
-    const matchSearch = !search.value || t.title.toLowerCase().includes(search.value.toLowerCase())
-    const matchStatus = statusFilter.value === 'all' || t.status === statusFilter.value
-    return matchSearch && matchStatus
-  })
+function load() {
+  const params = { page: page.value, per_page: 15 }
+  if (search.value) params.search = search.value
+  if (statusFilter.value !== 'all') params.status = statusFilter.value
+  store.fetchAll(params)
+}
+
+onMounted(() => {
+  patientsStore.fetchAll({ per_page: 100 })
+  load()
 })
+
+function onSearch() { page.value = 1; load() }
+
+function onStatusFilter(val) {
+  statusFilter.value = val
+  page.value = 1
+  load()
+}
+
+function goTo(p) { page.value = p; load() }
 
 function openModal(t = null) {
   editing.value = t
@@ -188,6 +213,7 @@ async function handleSubmit() {
       await store.create(data)
     }
     closeModal()
+    load()
   } catch (e) {
     modalError.value = e.response?.data?.message || 'Erro ao salvar.'
   } finally { submitting.value = false }
@@ -241,6 +267,12 @@ function formatDate(d) {
 .tc-title { font-size: 15px; font-weight: 600; line-height: 1.4; }
 .tc-meta { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-muted); margin-top: auto; }
 
+.pagination {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  padding: 16px 0;
+}
+.page-info { font-size: 13px; color: var(--text-muted); }
+
 .icon-btn {
   background: none; border: none; cursor: pointer;
   color: var(--text-muted); padding: 4px; border-radius: 6px;
@@ -253,7 +285,6 @@ function formatDate(d) {
   text-align: center; color: var(--text-muted); padding: 60px;
 }
 
-/* Modal */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 200;
   background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);

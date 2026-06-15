@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { patientsApi, treatmentsApi } from '../api/services'
 
 export const usePatientsStore = defineStore('patients', () => {
@@ -7,12 +7,27 @@ export const usePatientsStore = defineStore('patients', () => {
   const currentPatient = ref(null)
   const patientTreatments = ref([])
   const loading = ref(false)
+  const pagination = reactive({
+    currentPage: 1,
+    lastPage: 1,
+    total: 0,
+    perPage: 15,
+  })
 
-  async function fetchAll() {
+  async function fetchAll(params = {}) {
     loading.value = true
     try {
-      const res = await patientsApi.list()
-      patients.value = res.data
+      const res = await patientsApi.list(params)
+      const data = res.data
+      if (data.data) {
+        patients.value = data.data
+        pagination.currentPage = data.current_page || 1
+        pagination.lastPage = data.last_page || 1
+        pagination.total = data.total || 0
+        pagination.perPage = data.per_page || 15
+      } else {
+        patients.value = data
+      }
     } finally {
       loading.value = false
     }
@@ -57,5 +72,16 @@ export const usePatientsStore = defineStore('patients', () => {
     patients.value = patients.value.filter(p => p.id !== id)
   }
 
-  return { patients, currentPatient, patientTreatments, loading, fetchAll, fetchOne, fetchTreatments, create, createTreatment, update, remove }
+  async function toggleActive(id) {
+    const res = await patientsApi.toggleActive(id)
+    if (currentPatient.value) {
+      currentPatient.value.active = res.data.active
+    }
+    return res.data
+  }
+
+  return {
+    patients, currentPatient, patientTreatments, loading, pagination,
+    fetchAll, fetchOne, fetchTreatments, create, createTreatment, update, remove, toggleActive,
+  }
 })

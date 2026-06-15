@@ -7,13 +7,36 @@
         </svg>
         Voltar
       </RouterLink>
-      <button class="btn btn-primary" @click="openEditModal()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
-        Editar
-      </button>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-sm" @click="downloadReport" :disabled="reportLoading">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          Relatório PDF
+        </button>
+        <button class="btn btn-ghost btn-sm" @click="toggleActive" :disabled="toggling">
+          <template v-if="patient?.active !== false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+            Inativar
+          </template>
+          <template v-else>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Ativar
+          </template>
+        </button>
+        <button class="btn btn-primary" @click="openEditModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          Editar
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="patient-header-card card skeleton-card">
@@ -27,7 +50,10 @@
     <div v-else-if="patient" class="patient-header-card card">
       <div class="patient-avatar-lg">{{ initial(patient.user?.name) }}</div>
       <div class="patient-header-info">
-        <h1 class="patient-name">{{ patient.user?.name }}</h1>
+        <div class="patient-name-row">
+          <h1 class="patient-name">{{ patient.user?.name }}</h1>
+          <span v-if="patient.active === false" class="badge badge-cancelled">Inativo</span>
+        </div>
         <div class="patient-meta-row">
           <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>{{ patient.email }}</span>
           <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>{{ patient.phone_number || '—' }}</span>
@@ -72,7 +98,65 @@
       </div>
     </div>
 
-    <!-- Edit Patient Modal -->
+    <!-- Diário de Sessões -->
+    <div class="card">
+      <div class="section-header">
+        <h3 class="section-title">Diário de Sessões</h3>
+        <div class="diary-tabs">
+          <button class="btn btn-ghost btn-sm" :class="{ active: diaryPeriod === 7 }" @click="diaryPeriod = 7; loadDiary()">7 dias</button>
+          <button class="btn btn-ghost btn-sm" :class="{ active: diaryPeriod === 30 }" @click="diaryPeriod = 30; loadDiary()">30 dias</button>
+          <button class="btn btn-ghost btn-sm" :class="{ active: diaryPeriod === 90 }" @click="diaryPeriod = 90; loadDiary()">90 dias</button>
+        </div>
+      </div>
+      <div v-if="diaryLoading" class="skeleton-list">
+        <div v-for="i in 3" :key="i" class="skeleton" style="height:40px;margin-bottom:4px"></div>
+      </div>
+      <div v-else-if="!diarySessions.length" class="empty-state-sm">
+        <p>Nenhuma sessão registrada neste período.</p>
+      </div>
+      <div v-else class="diary-list">
+        <div v-for="s in diarySessions" :key="s.id" class="diary-row">
+          <div class="diary-date">{{ formatDate(s.session_date) }}</div>
+          <div class="diary-exercise">{{ s.treatment_item?.exercise?.title || 'Exercício' }}</div>
+          <div v-if="s.completed" class="diary-levels">
+            <span v-if="s.pain_level" class="diary-level" :class="levelClass(s.pain_level)">Dor {{ s.pain_level }}</span>
+            <span v-if="s.fatigue_level" class="diary-level" :class="levelClass(s.fatigue_level)">Fadiga {{ s.fatigue_level }}</span>
+            <span v-if="s.difficulty_level" class="diary-level" :class="levelClass(s.difficulty_level)">Dificuldade {{ s.difficulty_level }}</span>
+          </div>
+          <div v-else class="diary-incomplete">Não concluída</div>
+        </div>
+      </div>
+      <div v-if="diaryPagination.lastPage > 1" class="pagination">
+        <button class="btn btn-ghost btn-sm" :disabled="diaryPage === 1" @click="diaryPage--; loadDiary()">Anterior</button>
+        <span class="page-info">{{ diaryPage }} / {{ diaryPagination.lastPage }}</span>
+        <button class="btn btn-ghost btn-sm" :disabled="diaryPage === diaryPagination.lastPage" @click="diaryPage++; loadDiary()">Próxima</button>
+      </div>
+    </div>
+
+    <!-- Stats do Diário -->
+    <div v-if="diaryStats" class="card">
+      <h3 class="section-title">Resumo do Período</h3>
+      <div class="diary-stats-grid">
+        <div class="diary-stat">
+          <div class="stat-num">{{ diaryStats.total_sessions }}</div>
+          <div class="stat-desc">Sessões</div>
+        </div>
+        <div class="diary-stat">
+          <div class="stat-num">{{ diaryStats.completed_sessions }}</div>
+          <div class="stat-desc">Concluídas</div>
+        </div>
+        <div class="diary-stat">
+          <div class="stat-num">{{ diaryStats.adherence_rate }}%</div>
+          <div class="stat-desc">Adesão</div>
+        </div>
+        <div class="diary-stat" v-if="diaryStats.avg_pain">
+          <div class="stat-num">{{ diaryStats.avg_pain }}</div>
+          <div class="stat-desc">Média Dor</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Modal -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
@@ -151,6 +235,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { usePatientsStore } from '../stores/patients'
+import { diaryApi } from '../api/services'
 
 const route = useRoute()
 const patientsStore = usePatientsStore()
@@ -173,6 +258,10 @@ const editForm = reactive({
 const treatmentForm = reactive({
   title: '', start_date: ''
 })
+
+const toggling = ref(false)
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 function initial(name) {
   return name?.[0]?.toUpperCase() || '?'
@@ -201,7 +290,6 @@ async function loadPatient() {
   loading.value = true
   try {
     patient.value = await patientsStore.fetchOne(route.params.id)
-    console.log('Patient data:', patient.value)
     if (patient.value) {
       Object.assign(editForm, {
         birth_date: patient.value.birth_date || '',
@@ -214,6 +302,87 @@ async function loadPatient() {
   }
 }
 
+// Diary
+const diarySessions = ref([])
+const diaryLoading = ref(false)
+const diaryPeriod = ref(7)
+const diaryPage = ref(1)
+const diaryPagination = reactive({ lastPage: 1 })
+const diaryStats = ref(null)
+
+async function loadDiary() {
+  if (!patient.value) return
+  diaryLoading.value = true
+  diaryPage.value = 1
+  try {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - diaryPeriod.value)
+
+    const [sessionsRes, statsRes] = await Promise.all([
+      diaryApi.list({
+        patient_id: patient.value.id,
+        per_page: 10,
+        page: diaryPage.value,
+        start_date: startDate.toISOString().slice(0, 10),
+        end_date: endDate.toISOString().slice(0, 10),
+      }),
+      diaryApi.stats({
+        patient_id: patient.value.id,
+        start_date: startDate.toISOString().slice(0, 10),
+        end_date: endDate.toISOString().slice(0, 10),
+      }),
+    ])
+
+    const data = sessionsRes.data
+    if (data.data) {
+      diarySessions.value = data.data
+      diaryPagination.lastPage = data.last_page || 1
+    } else {
+      diarySessions.value = data
+    }
+    diaryStats.value = statsRes.data
+  } catch (e) {
+    console.error('Erro ao carregar diário:', e)
+  } finally {
+    diaryLoading.value = false
+  }
+}
+
+function levelClass(level) {
+  if (level <= 2) return 'level-low'
+  if (level <= 3) return 'level-mid'
+  return 'level-high'
+}
+
+// Toggle active
+async function toggleActive() {
+  toggling.value = true
+  try {
+    await patientsStore.toggleActive(route.params.id)
+    patient.value.active = !patient.value.active
+  } catch (e) {
+    console.error('Erro ao alterar status:', e)
+  } finally {
+    toggling.value = false
+  }
+}
+
+// Report download
+const reportLoading = ref(false)
+
+async function downloadReport() {
+  reportLoading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const url = `${API_URL}/patients/${route.params.id}/report?token=${token}`
+    window.open(url, '_blank')
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+// Modal actions
 function openEditModal() {
   error.value = ''
   showEditModal.value = true
@@ -266,7 +435,8 @@ onMounted(() => loadPatient())
 
 <style scoped>
 .patient-detail-page { display: flex; flex-direction: column; gap: 20px; }
-.page-header { display: flex; align-items: center; justify-content: space-between; }
+.page-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
 .back-link { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 14px; transition: color var(--transition); text-decoration: none; }
 .back-link:hover { color: var(--text); }
 
@@ -278,7 +448,8 @@ onMounted(() => loadPatient())
   font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--teal);
 }
 .patient-header-info { flex: 1; }
-.patient-name { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+.patient-name-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.patient-name { font-size: 24px; font-weight: 700; }
 .patient-meta-row { display: flex; flex-wrap: wrap; gap: 16px; color: var(--text-muted); font-size: 14px; }
 .patient-meta-row span { display: flex; align-items: center; gap: 6px; }
 
@@ -308,6 +479,35 @@ onMounted(() => loadPatient())
 
 .empty-state-sm { padding: 40px; text-align: center; color: var(--text-muted); font-size: 14px; }
 
+/* Diary */
+.diary-tabs { display: flex; gap: 4px; }
+.diary-tabs .btn.active { border-color: var(--teal); color: var(--teal); }
+.diary-list { display: flex; flex-direction: column; }
+.diary-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 20px; border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.diary-row:first-child { border-top: none; }
+.diary-date { width: 90px; font-weight: 600; flex-shrink: 0; }
+.diary-exercise { flex: 1; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.diary-levels { display: flex; gap: 8px; }
+.diary-level { padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+.level-low { background: var(--green-dim); color: var(--green); }
+.level-mid { background: var(--amber); color: #0a0f1e; }
+.level-high { background: var(--red-dim); color: var(--red); }
+.diary-incomplete { color: var(--text-muted); font-style: italic; }
+
+.diary-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 16px; }
+.diary-stat { text-align: center; padding: 16px; }
+.stat-num { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--teal); }
+.stat-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
+.page-info { font-size: 13px; color: var(--text-muted); }
+.skeleton-list { padding: 12px 20px; }
+
+/* Modals */
 .modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: 0 32px 80px rgba(0,0,0,0.5); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }

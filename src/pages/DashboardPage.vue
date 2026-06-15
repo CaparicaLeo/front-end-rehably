@@ -11,6 +11,30 @@
       </RouterLink>
     </div>
 
+    <!-- Alertas -->
+    <div v-if="alertsData && alertsData.total_late > 0" class="alert-banner">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <div class="alert-body">
+        <span class="alert-title">{{ alertsData.total_late }} paciente{{ alertsData.total_late > 1 ? 's' : '' }} com sessões atrasadas</span>
+        <span class="alert-sub">Não registraram sessão nos últimos 7 dias</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" @click="showLate = !showLate">
+        {{ showLate ? 'Ocultar' : 'Ver' }}
+      </button>
+    </div>
+
+    <div v-if="showLate && alertsData?.late_patients?.length" class="card late-list">
+      <div v-for="p in alertsData.late_patients" :key="p.id" class="late-row">
+        <RouterLink :to="`/patients/${p.id}`" class="late-name">{{ p.name }}</RouterLink>
+        <span class="late-days">
+          {{ p.days_since_last_session !== null ? `${p.days_since_last_session} dias sem sessão` : 'Nunca registrou' }}
+        </span>
+      </div>
+    </div>
+
     <!-- Stats grid -->
     <div class="stats-grid">
       <div class="stat-card" v-for="stat in stats" :key="stat.label">
@@ -96,15 +120,28 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useTreatmentsStore } from '../stores/treatments'
+import { dashboardApi } from '../api/services'
 
 const auth = useAuthStore()
 const store = useTreatmentsStore()
 
-onMounted(() => store.fetchAll())
+const alertsData = ref(null)
+const showLate = ref(false)
+
+onMounted(async () => {
+  store.fetchAll()
+  try {
+    const res = await dashboardApi.alerts()
+    alertsData.value = res.data
+    if (res.data.total_late > 0) showLate.value = true
+  } catch (e) {
+    console.error('Erro ao carregar alertas:', e)
+  }
+})
 
 const firstName = computed(() => auth.user?.name?.split(' ')[0] || 'Doutor')
 const statusLabel = { ongoing: 'Em andamento', completed: 'Concluído', cancelled: 'Cancelado' }
@@ -175,6 +212,27 @@ function formatDate(d) {
 .dash-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .page-title { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
 .page-sub { color: var(--text-muted); font-size: 14px; }
+
+.alert-banner {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--amber); color: #0a0f1e;
+  border-radius: var(--radius-lg); padding: 14px 20px;
+}
+.alert-body { flex: 1; display: flex; flex-direction: column; }
+.alert-title { font-weight: 600; font-size: 14px; }
+.alert-sub { font-size: 12px; opacity: 0.7; }
+.alert-banner .btn-ghost { border-color: rgba(0,0,0,0.15); color: #0a0f1e; }
+.alert-banner .btn-ghost:hover { border-color: rgba(0,0,0,0.3); }
+
+.late-list { padding: 12px 20px; }
+.late-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.late-row:last-child { border-bottom: none; }
+.late-name { font-weight: 500; font-size: 14px; }
+.late-name:hover { color: var(--teal); }
+.late-days { font-size: 12px; color: var(--text-muted); }
 
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 .stat-card {

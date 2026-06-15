@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { treatmentsApi, treatmentItemsApi } from '../api/services'
 
 export const useTreatmentsStore = defineStore('treatments', () => {
@@ -7,12 +7,27 @@ export const useTreatmentsStore = defineStore('treatments', () => {
   const currentTreatment = ref(null)
   const items = ref([])
   const loading = ref(false)
+  const pagination = reactive({
+    currentPage: 1,
+    lastPage: 1,
+    total: 0,
+    perPage: 15,
+  })
 
-  async function fetchAll() {
+  async function fetchAll(params = {}) {
     loading.value = true
     try {
-      const res = await treatmentsApi.list()
-      treatments.value = res.data.data || res.data
+      const res = await treatmentsApi.list(params)
+      const data = res.data
+      if (data.data) {
+        treatments.value = data.data
+        pagination.currentPage = data.current_page || 1
+        pagination.lastPage = data.last_page || 1
+        pagination.total = data.total || 0
+        pagination.perPage = data.per_page || 15
+      } else {
+        treatments.value = data
+      }
     } finally {
       loading.value = false
     }
@@ -68,7 +83,7 @@ export const useTreatmentsStore = defineStore('treatments', () => {
   }
 
   return {
-    treatments, currentTreatment, items, loading,
+    treatments, currentTreatment, items, loading, pagination,
     fetchAll, fetchOne, create, update, remove,
     fetchItems, createItem, updateItem, removeItem
   }

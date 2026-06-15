@@ -10,7 +10,7 @@ export const authApi = {
 }
 
 export const treatmentsApi = {
-  list: () => api.get('/treatments'),
+  list: (params) => api.get('/treatments', { params }),
   get: (id) => api.get(`/treatments/${id}`),
   create: (data) => api.post('/treatments', data),
   update: (id, data) => api.put(`/treatments/${id}`, data),
@@ -33,18 +33,30 @@ export const addressApi = {
 }
 
 export const patientsApi = {
-  list: () => api.get('/patients'),
+  list: (params) => api.get('/patients', { params }),
   get: (id) => api.get(`/patients/${id}`),
   create: (data) => api.post('/patients', data),
   update: (id, data) => api.put(`/patients/${id}`, data),
   delete: (id) => api.delete(`/patients/${id}`),
   getTreatments: (id) => api.get(`/patients/${id}/treatments`),
+  toggleActive: (id) => api.patch(`/patients/${id}/toggle-active`),
 }
 
 export const exercisesApi = {
-  list: () => api.get('/exercises'),
+  list: (params) => api.get('/exercises', { params }),
   get: (id) => api.get(`/exercises/${id}`),
   create: (data) => api.post('/exercises', data),
   update: (id, data) => api.put(`/exercises/${id}`, data),
   delete: (id) => api.delete(`/exercises/${id}`),
+}
+
+export const diaryApi = {
+  list: (params) => api.get('/diary', { params }),
+  get: (id) => api.get(`/diary/${id}`),
+  create: (data) => api.post('/diary', data),
+  stats: (params) => api.get('/diary/stats', { params }),
+}
+
+export const dashboardApi = {
+  alerts: () => api.get('/dashboard/alerts'),
 }
